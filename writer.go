@@ -43,7 +43,7 @@ func (w *response) Write(m []byte) (int, error) {
 		if lm < 2 {
 			return 0, io.ErrShortBuffer
 		}
-		if lm > maxMsgSize {
+		if lm > MaxMsgSize {
 			return 0, errMsgLarge
 		}
 
@@ -55,10 +55,8 @@ func (w *response) Write(m []byte) (int, error) {
 
 		return int(n), err
 	default:
-		log.Alert("Switch Not reached")
+		panic("Write switch fatal")
 	}
-
-	panic("Write switch fatal")
 }
 
 // WriteMsg implements the ResponseWriter.WriteMsg method.
@@ -71,11 +69,10 @@ func (w *response) WriteMsg(m *Msg) (err error) {
 		return err
 	}
 
-	n, err := w.writer.Write(data)
+	_, err = w.writer.Write(data)
 	if err != nil {
 		return err
 	}
-	log.Debugf("MSG Writed: %s bytes", n)
 
 	return nil
 }

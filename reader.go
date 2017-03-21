@@ -5,8 +5,8 @@ import (
 	"time"
 )
 
-// Reader reads raw protoBuf messages.
-// Each call to ReadTCP or ReadUDP should return an raw protoBuf message.
+// Reader reads raw messages.
+// Each call to ReadTCP or ReadUDP should return an raw message.
 type Reader interface {
 	// ReadTCP reads a raw message from a TCP connection.
 	ReadTCP(conn net.Conn, timeout time.Duration) ([]byte, error)
@@ -14,8 +14,8 @@ type Reader interface {
 	ReadUDP(conn *net.UDPConn, timeout time.Duration) ([]byte, *SessionUDP, error)
 }
 
-// defaultReader is an adapter for the Server struct that implements the Reader interface
-// using the readTCP and readUDP func of the embedded Server.
+// defaultReader is an adapter
+// implementing Reader interface
 type defaultReader struct {
 	*Server
 }

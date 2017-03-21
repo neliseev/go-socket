@@ -10,8 +10,6 @@ import (
 	"encoding/binary"
 )
 
-var self *Server
-
 // A Server defines parameters for running an EDGE server.
 type Server struct {
 	Addr        string
@@ -22,17 +20,6 @@ type Server struct {
 	running     sync.WaitGroup
 	lock        sync.RWMutex
 	started     bool
-}
-
-// ToDo doc it
-func ListenAndServe(addr string, proto string) error {
-	self = &Server{
-		Addr:    addr,
-		Proto:   proto,
-		UDPSize: udpMsgSize,
-	}
-
-	return self.ListenAndServe()
 }
 
 // ToDo doc it
@@ -95,10 +82,6 @@ func (srv *Server) ListenAndServe() error {
 	}
 }
 
-func Shutdown() error {
-	return self.Shutdown()
-}
-
 // Shutdown gracefully shuts down a server
 func (srv *Server) Shutdown() error {
 	srv.lock.Lock()
@@ -128,7 +111,7 @@ func (srv *Server) Shutdown() error {
 	}()
 
 	select {
-	case <-time.After(rtimeout):
+	case <-time.After(Rtimeout):
 		// ToDO: try kill it?
 		return errors.New("Can't stop server")
 	case <-f:
@@ -155,7 +138,7 @@ func (srv *Server) serveTCP(l net.Listener) error {
 			return err
 		}
 
-		m, err := reader.ReadTCP(rw, rtimeout)
+		m, err := reader.ReadTCP(rw, Rtimeout)
 		srv.lock.RLock()
 		if !srv.started {
 			srv.lock.RUnlock()
@@ -182,7 +165,7 @@ func (srv *Server) serveUDP(l *net.UDPConn) error {
 	reader := Reader(&defaultReader{srv})
 
 	for {
-		m, s, err := reader.ReadUDP(l, rtimeout)
+		m, s, err := reader.ReadUDP(l, Rtimeout)
 		srv.lock.RLock()
 		if !srv.started {
 			srv.lock.RUnlock()
