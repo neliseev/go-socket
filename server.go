@@ -6,19 +6,22 @@ import (
 	"sync"
 	"fmt"
 	"time"
-	"bytes"
 	"encoding/binary"
 )
 
 type Server struct {
-	Addr        string
-	Proto       string
-	ListenerTCP net.Listener
-	ListenerUDP net.PacketConn
-	UDPSize     int            // Default 508 byte by RFC 791 (minimal IP length is are 576 byte)
-	running     sync.WaitGroup
-	lock        sync.RWMutex
-	started     bool
+	Addr          string
+	Proto         string
+	ListenerTCP   net.Listener
+	IdleTimeout   time.Duration
+	MaxTCPQueries int            //
+	ListenerUDP   net.PacketConn
+	UDPSize       int            // Default 508 byte by RFC 791 (minimal IP length is are 576 byte)
+	Handler       Handler
+	MsgSep        byte           // Separator
+	running       sync.WaitGroup //
+	lock          sync.RWMutex
+	started       bool
 }
 
 func (srv *Server) ListenAndServe() error {
@@ -85,6 +88,11 @@ func (srv *Server) serveTCP(l net.Listener) error {
 
 	reader := Reader(&defaultReader{srv})
 
+	handler := srv.Handler
+	if handler == nil {
+		handler = DefaultServeMux
+	}
+
 	for {
 		rw, err := l.Accept()
 		if err != nil {
@@ -97,7 +105,7 @@ func (srv *Server) serveTCP(l net.Listener) error {
 			return err
 		}
 
-		m, err := reader.ReadTCP(rw, Rtimeout)
+		m, err := reader.ReadTCP(rw, rtimeout)
 		srv.lock.RLock()
 		if !srv.started {
 			srv.lock.RUnlock()
@@ -112,7 +120,7 @@ func (srv *Server) serveTCP(l net.Listener) error {
 		}
 
 		srv.running.Add(1)
-		go srv.serve(rw.RemoteAddr(), m, nil, nil, rw)
+		go srv.serve(rw.RemoteAddr(), handler, m, nil, nil, rw)
 	}
 }
 
@@ -121,8 +129,13 @@ func (srv *Server) serveUDP(l *net.UDPConn) error {
 
 	reader := Reader(&defaultReader{srv})
 
+	handler := srv.Handler
+	if handler == nil {
+		handler = DefaultServeMux
+	}
+
 	for {
-		m, s, err := reader.ReadUDP(l, Rtimeout)
+		m, s, err := reader.ReadUDP(l, rtimeout)
 		srv.lock.RLock()
 		if !srv.started {
 			srv.lock.RUnlock()
@@ -137,19 +150,73 @@ func (srv *Server) serveUDP(l *net.UDPConn) error {
 		}
 
 		srv.running.Add(1)
-		go srv.serve(s.RemoteAddr(), m, l, nil, nil)
+		go srv.serve(s.RemoteAddr(), handler, m, l, nil, nil)
 	}
 }
 
-func (srv *Server) serve(a net.Addr, m []byte, u *net.UDPConn, s *SessionUDP, t net.Conn) {
+func (srv *Server) serve(a net.Addr, h Handler, m []byte, u *net.UDPConn, s *SessionUDP, t net.Conn) {
 	defer srv.running.Done()
 
-	req := string(bytes.Split(m, []byte("::"))[0])
-	log.Debugf("REQ is: %s", req)
-	msgRaw := bytes.Split(m, []byte("::"))[1]
+	reader := Reader(&defaultReader{srv})
+	writer := &response{
+		udp: u,
+		tcp: t,
+		remoteAddr: a,
+	}
 
-	log.Debugf("MSG: %s", msgRaw)
+	// Init TCP queue
+	q := 0
 
+	////
+	// Redo Label
+	Redo:
+	req := new(Msg)
+	sep := msgSep
+	if srv.MsgSep != nil { sep = srv.MsgSep }
+	err := req.Unpack(m, sep)
+	if err != nil {
+		// ToDo Return some err
+		goto Exit
+	}
+
+	h.Serve(writer, req)
+
+	////
+	// Exit Label
+	Exit:
+	if writer.tcp == nil {
+		return
+	}
+
+	// close socket after this many queries
+	maxQueries := maxTCPQueries
+	if srv.MaxTCPQueries != nil { maxQueries = srv.MaxTCPQueries }
+	if q > maxQueries {
+		writer.Close()
+		return
+	}
+
+	// UDP, "close" and return
+	if u != nil {
+		writer.Close()
+		return
+	}
+
+	idleTimeout := tcpIdleTimeout
+	if srv.IdleTimeout != nil {
+		idleTimeout = srv.IdleTimeout()
+	}
+
+	m, err = reader.ReadTCP(writer.tcp, idleTimeout)
+	if err == nil {
+		q++
+
+		goto Redo
+	}
+
+	writer.Close()
+
+	return
 }
 
 func (srv *Server) readTCP(conn net.Conn, timeout time.Duration) ([]byte, error) {
@@ -197,6 +264,7 @@ func (srv *Server) readTCP(conn net.Conn, timeout time.Duration) ([]byte, error)
 }
 
 func (srv *Server) readUDP(conn *net.UDPConn, timeout time.Duration) ([]byte, *SessionUDP, error) {
+	// ToDo use UDPSize
 	m := make([]byte, 508)
 	n, s, err := ReadFromSessionUDP(conn, m)
 	if err != nil || n == 0 {
@@ -238,7 +306,7 @@ func (srv *Server) Shutdown() error {
 	}()
 
 	select {
-	case <-time.After(Rtimeout):
+	case <-time.After(rtimeout):
 	// ToDO: try kill it?
 		return errors.New("Can't stop server")
 	case <-f:
