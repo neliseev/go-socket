@@ -1,0 +1,13 @@
+### Go template
+# Binaries for programs and plugins
+/bin/
+/pkg/
+
+# Test binary, build with `go test -c`
+*.test
+
+### IntelliJ project files
+.idea
+*.iml
+out
+gen
