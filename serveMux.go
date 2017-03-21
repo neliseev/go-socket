@@ -44,7 +44,7 @@ func (mux *ServeMux) HandleRemove(pattern string) {
 func (mux *ServeMux) Serve(w Response, m *Msg) {
 	var h Handler
 
-	if len(m.Req) == "" {
+	if m.Req == "" {
 		h = failedHandler()
 	} else {
 		if h = mux.match(m.Req); h == nil {
