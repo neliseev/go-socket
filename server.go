@@ -8,9 +8,6 @@ import (
 	"time"
 	"bytes"
 	"encoding/binary"
-	"routeX/core/proto/register"
-	"routeX/core/proto/health"
-	"github.com/golang/protobuf/proto"
 )
 
 var self *Server
@@ -212,31 +209,8 @@ func (srv *Server) serve(a net.Addr, m []byte, u *net.UDPConn, s *SessionUDP, t 
 	log.Debugf("REQ is: %s", req)
 	msgRaw := bytes.Split(m, []byte("::"))[1]
 
-	switch req {
-	case "register":
-		msg := new(register.RegisterNODEReq)
-		if err := proto.Unmarshal(msgRaw, msg); err != nil {
-			log.Errf("PROTO Register: %s", err)
-		}
+	log.Debugf("MSG: %s", msgRaw)
 
-		log.Debugf("Req: %s, City: %s", req, msg.GetCity())
-
-		return
-	case "health":
-		msg := new(health.HealthReq)
-		if err := proto.Unmarshal(msgRaw, msg); err != nil {
-			log.Errf("PROTO Health: %s", err)
-		}
-
-		log.Debugf("Req: %s, Client: %s", req, msg.Client)
-
-		return
-
-	default:
-		log.Errf("Unhandled msg")
-
-		return
-	}
 }
 
 // todo doc it
