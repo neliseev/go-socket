@@ -1,2 +1,1 @@
-# protobuf-server
-Server based on protocol buffers
+# Server Socket TCP/UDP
