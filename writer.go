@@ -7,14 +7,11 @@ import (
 	"bytes"
 )
 
-// Writer writes raw protoBuf reply messages.
-// Each call to Write should send an entire message.
 type Writer interface {
 	io.Writer
 }
 
-// A ResponseWriter interface
-type ResponseWriter interface {
+type Response interface {
 	LocalAddr()    net.Addr     // LocalAddr returns net.Addr of the server
 	RemoteAddr()   net.Addr     // RemoteAddr returns net.Addr of client that sent the current request.
 	WriteMsg(*Msg) error        // WriteMsg writes a reply back to the client.
@@ -31,7 +28,6 @@ type response struct {
 }
 
 
-// Write implements the ResponseWriter.Write method.
 func (w *response) Write(m []byte) (int, error) {
 	switch {
 	case w.udp != nil:
@@ -59,7 +55,6 @@ func (w *response) Write(m []byte) (int, error) {
 	}
 }
 
-// WriteMsg implements the ResponseWriter.WriteMsg method.
 func (w *response) WriteMsg(m *Msg) (err error) {
 	var data []byte
 
@@ -77,7 +72,6 @@ func (w *response) WriteMsg(m *Msg) (err error) {
 	return nil
 }
 
-// LocalAddr implements the ResponseWriter.LocalAddr method.
 func (w *response) LocalAddr() net.Addr {
 	if w.tcp != nil {
 		return w.tcp.LocalAddr()
@@ -85,10 +79,8 @@ func (w *response) LocalAddr() net.Addr {
 	return w.udp.LocalAddr()
 }
 
-// RemoteAddr implements the ResponseWriter.RemoteAddr method.
 func (w *response) RemoteAddr() net.Addr { return w.remoteAddr }
 
-// Close implements the ResponseWriter.Close method
 func (w *response) Close() error {
 	// Can't close the udp conn, as that is actually the listener.
 	if w.tcp != nil {

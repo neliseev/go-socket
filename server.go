@@ -10,7 +10,6 @@ import (
 	"encoding/binary"
 )
 
-// A Server defines parameters for running an EDGE server.
 type Server struct {
 	Addr        string
 	Proto       string
@@ -22,13 +21,12 @@ type Server struct {
 	started     bool
 }
 
-// ToDo doc it
 func (srv *Server) ListenAndServe() error {
 	srv.lock.Lock()
 	defer srv.lock.Unlock()
 
 	if srv.started {
-		return errors.New("EDGE server already started")
+		return errors.New("Socket server already started")
 	}
 
 	addr := srv.Addr
@@ -45,7 +43,7 @@ func (srv *Server) ListenAndServe() error {
 
 		l, err := net.ListenTCP(srv.Proto, a)
 		if err != nil {
-			return fmt.Errorf("EDGE server ListenTCP: %s", err)
+			return fmt.Errorf("Socket server ListenTCP: %s", err)
 		}
 
 		srv.ListenerTCP = l
@@ -65,7 +63,7 @@ func (srv *Server) ListenAndServe() error {
 
 		l, err := net.ListenUDP(srv.Proto, a)
 		if err != nil {
-			return fmt.Errorf("EDGE server ListenUDP: %s", err)
+			return fmt.Errorf("Socket server ListenUDP: %s", err)
 		}
 
 		srv.ListenerUDP = l
@@ -78,49 +76,10 @@ func (srv *Server) ListenAndServe() error {
 
 		return err
 	default:
-		return fmt.Errorf("EDGE can't start server, incorrect proto: %s", srv.Proto)
+		return fmt.Errorf("Socket can't start server, incorrect proto: %s", srv.Proto)
 	}
 }
 
-// Shutdown gracefully shuts down a server
-func (srv *Server) Shutdown() error {
-	srv.lock.Lock()
-	if !srv.started {
-		srv.lock.Unlock()
-
-		return errors.New("EDGE server not started")
-	}
-	srv.started = false
-	srv.lock.Unlock()
-
-	// Close UDP
-	if srv.ListenerUDP != nil {
-		srv.ListenerUDP.Close()
-	}
-
-	// Close TCP
-	if srv.ListenerTCP != nil {
-		srv.ListenerTCP.Close()
-	}
-
-	// Finalizing all active connections
-	f := make(chan bool)
-	go func() {
-		srv.running.Wait()
-		f <- true
-	}()
-
-	select {
-	case <-time.After(Rtimeout):
-		// ToDO: try kill it?
-		return errors.New("Can't stop server")
-	case <-f:
-		return nil
-	}
-}
-
-// serveTCP
-// Each request is handled in a separate goroutine.
 func (srv *Server) serveTCP(l net.Listener) error {
 	defer l.Close()
 
@@ -147,7 +106,7 @@ func (srv *Server) serveTCP(l net.Listener) error {
 		}
 		srv.lock.RUnlock()
 		if err != nil {
-			log.Errf("EDGE Serve TCP: %s", err)
+			log.Errf("Socket Serve TCP: %s", err)
 
 			continue
 		}
@@ -157,8 +116,6 @@ func (srv *Server) serveTCP(l net.Listener) error {
 	}
 }
 
-// serveUDP
-// Each request is handled in a separate goroutine.
 func (srv *Server) serveUDP(l *net.UDPConn) error {
 	defer l.Close()
 
@@ -174,7 +131,7 @@ func (srv *Server) serveUDP(l *net.UDPConn) error {
 		}
 		srv.lock.RUnlock()
 		if err != nil {
-			log.Errf("EDGE Serve UDP: %s", err)
+			log.Errf("Socket Serve UDP: %s", err)
 
 			continue
 		}
@@ -184,7 +141,6 @@ func (srv *Server) serveUDP(l *net.UDPConn) error {
 	}
 }
 
-// todo doc it || not implemented like dispatcher
 func (srv *Server) serve(a net.Addr, m []byte, u *net.UDPConn, s *SessionUDP, t net.Conn) {
 	defer srv.running.Done()
 
@@ -196,7 +152,6 @@ func (srv *Server) serve(a net.Addr, m []byte, u *net.UDPConn, s *SessionUDP, t 
 
 }
 
-// todo doc it
 func (srv *Server) readTCP(conn net.Conn, timeout time.Duration) ([]byte, error) {
 	conn.SetReadDeadline(time.Now().Add(timeout))
 
@@ -241,7 +196,6 @@ func (srv *Server) readTCP(conn net.Conn, timeout time.Duration) ([]byte, error)
 	return m, nil
 }
 
-// ToDo Doc IT || not tested
 func (srv *Server) readUDP(conn *net.UDPConn, timeout time.Duration) ([]byte, *SessionUDP, error) {
 	m := make([]byte, 508)
 	n, s, err := ReadFromSessionUDP(conn, m)
@@ -254,4 +208,40 @@ func (srv *Server) readUDP(conn *net.UDPConn, timeout time.Duration) ([]byte, *S
 	m = m[:n]
 
 	return m, s, nil
+}
+
+func (srv *Server) Shutdown() error {
+	srv.lock.Lock()
+	if !srv.started {
+		srv.lock.Unlock()
+
+		return errors.New("Socket server not started")
+	}
+	srv.started = false
+	srv.lock.Unlock()
+
+	// Close UDP
+	if srv.ListenerUDP != nil {
+		srv.ListenerUDP.Close()
+	}
+
+	// Close TCP
+	if srv.ListenerTCP != nil {
+		srv.ListenerTCP.Close()
+	}
+
+	// Finalizing all active connections
+	f := make(chan bool)
+	go func() {
+		srv.running.Wait()
+		f <- true
+	}()
+
+	select {
+	case <-time.After(Rtimeout):
+	// ToDO: try kill it?
+		return errors.New("Can't stop server")
+	case <-f:
+		return nil
+	}
 }
