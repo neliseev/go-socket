@@ -6,7 +6,7 @@ import (
 )
 
 // Defaults vars
-var msgSep = byte(":")
+var msgSep = byte(':')
 
 // Constants
 const maxTCPQueries  int           = 256
