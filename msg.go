@@ -11,7 +11,7 @@ type Msg struct {
 
 // Unpack binary message to Msq structure
 // s is are separator
-func (m *Msg) Unpack(data []byte, s byte) error {
+func (m *Msg) Unpack(data []byte, s []byte) error {
 	if len(s) != 1 {
 		return errors.New("Separator size oferflow, should be 1")
 	}

@@ -172,7 +172,7 @@ func (srv *Server) serve(a net.Addr, h Handler, m []byte, u *net.UDPConn, s *Ses
 	Redo:
 	req := new(Msg)
 	sep := msgSep
-	if srv.MsgSep != nil { sep = srv.MsgSep }
+	if len(srv.MsgSep) != 0 { sep = srv.MsgSep }
 	err := req.Unpack(m, sep)
 	if err != nil {
 		// ToDo Return some err
@@ -190,7 +190,7 @@ func (srv *Server) serve(a net.Addr, h Handler, m []byte, u *net.UDPConn, s *Ses
 
 	// close socket after this many queries
 	maxQueries := maxTCPQueries
-	if srv.MaxTCPQueries != nil { maxQueries = srv.MaxTCPQueries }
+	if srv.MaxTCPQueries != 0 { maxQueries = srv.MaxTCPQueries }
 	if q > maxQueries {
 		writer.Close()
 		return
@@ -203,7 +203,7 @@ func (srv *Server) serve(a net.Addr, h Handler, m []byte, u *net.UDPConn, s *Ses
 	}
 
 	idleTimeout := tcpIdleTimeout
-	if srv.IdleTimeout != nil {
+	if srv.IdleTimeout != 0 {
 		idleTimeout = srv.IdleTimeout()
 	}
 
