@@ -172,7 +172,7 @@ func (srv *Server) serve(a net.Addr, h Handler, m []byte, u *net.UDPConn, s *Ses
 	Redo:
 	req := new(Msg)
 	sep := msgSep
-	if srv.MsgSep != nil { sep = srv.MsgSep }
+	if srv.MsgSep != 0 { sep = srv.MsgSep }
 	err := req.Unpack(m, sep)
 	if err != nil {
 		// ToDo Return some err
