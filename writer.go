@@ -5,15 +5,6 @@ import (
 	"net"
 	"encoding/binary"
 	"bytes"
-	"log"
-)
-
-
-import (
-	"io"
-	"encoding/binary"
-	"bytes"
-	"net"
 )
 
 // Writer writes raw protoBuf reply messages.
