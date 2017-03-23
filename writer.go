@@ -59,13 +59,12 @@ func (w *response) Write(m []byte) (int, error) {
 func (w *response) WriteMsg(m *Msg) (err error) {
 	var data []byte
 
-	// ToDo implement pack/unpack
 	data, err = m.Pack()
 	if err != nil {
 		return err
 	}
 
-	_, err = w.writer.Write(data)
+	_, err = w.Write(data)
 	if err != nil {
 		return err
 	}
