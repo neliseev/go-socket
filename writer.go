@@ -60,7 +60,7 @@ func (w *response) WriteMsg(m *Msg) (err error) {
 	var data []byte
 
 	// ToDo implement pack/unpack
-	//data, err = m.Pack()
+	data, err = m.Pack()
 	if err != nil {
 		return err
 	}

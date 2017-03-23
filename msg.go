@@ -2,11 +2,17 @@ package socket
 
 import (
 	"errors"
+	"encoding/binary"
 )
 
 type Msg struct {
 	Req  string
 	Data []byte
+}
+
+type packet struct {
+	size uint16 // packet size
+	data []byte // Operation
 }
 
 // Unpack binary message to Msq structure
@@ -32,4 +38,20 @@ func (m *Msg) Unpack(data []byte, s byte) error {
 	}
 
 	return nil
+}
+
+func (m *Msg) Pack() ([]byte, error) {
+	rawData := append([]byte(""), []byte(m.Req)...)
+	rawData = append(rawData, []byte("::")...)
+	rawData = append(rawData, m.Data...)
+	l := len(rawData)
+	pkt := &packet{size: uint16(l), data: rawData}
+
+	var buf []byte = make([]byte, 2 + l)
+	offset := 0
+	binary.BigEndian.PutUint16(buf[offset:], pkt.size)
+	offset += 2
+	copy(buf[offset:], pkt.data)
+
+	return buf, nil
 }
