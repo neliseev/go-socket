@@ -219,6 +219,7 @@ func (srv *Server) serve(a net.Addr, h Handler, m []byte, u *net.UDPConn, s *Ses
 	return
 }
 
+// ToDo add more specifics in errors
 func (srv *Server) readTCP(conn net.Conn, timeout time.Duration) ([]byte, error) {
 	conn.SetReadDeadline(time.Now().Add(timeout))
 
@@ -233,12 +234,14 @@ func (srv *Server) readTCP(conn net.Conn, timeout time.Duration) ([]byte, error)
 	}
 
 	length := binary.BigEndian.Uint16(l)
+	log.Debugf("TCP PKT length: %v", length)
 	if length == 0 {
 		return nil, errFlagLen
 	}
 
 	m := make([]byte, int(length))
 	n, err = conn.Read(m[:int(length)])
+	log.Debugf("Readed: %v TCP DATA: %v", n , m)
 	if err != nil || n == 0 {
 		if err != nil {
 			return nil, err
@@ -250,11 +253,14 @@ func (srv *Server) readTCP(conn net.Conn, timeout time.Duration) ([]byte, error)
 	i := n
 	for i < int(length) {
 		j, err := conn.Read(m[i:int(length)])
+		log.Debugf("J:%v", j)
 		if err != nil {
+			log.Debugf("Read TCP ERR: %v", err)
 			return nil, err
 		}
 
 		i += j
+		log.Debugf("I:%v", i)
 	}
 
 	n = i

@@ -10,6 +10,13 @@ type Msg struct {
 	Data []byte
 }
 
+type Packet struct {
+	packetSize uint16 // full packet size
+	headerSize uint16 // header size
+	header     []byte // Header
+	data       []byte // Data
+}
+
 type packet struct {
 	size uint16 // packet size
 	data []byte // Operation
@@ -22,20 +29,17 @@ func (m *Msg) Unpack(data []byte, s byte) error {
 		return errors.New("Separator size oferflow, should be 1")
 	}
 
-	for i, b := range data {
-		if b == s {
-			m.Req  = string(data[:i])
-			m.Data = data[i + 1:]
-
-			break
-		}
-
-		i++
+	headerLength := binary.BigEndian.Uint16(data[:2])
+	if headerLength == 0 {
+		return errHeaderLen
 	}
 
-	if m.Req == "" {
-		return errors.New("Undefined request in message")
-	}
+	data = data[2:] // Remove header size from data
+
+	// Unpack message
+	m.Req  = string(data[:headerLength])
+	// ToDo Test it
+	m.Data = data[headerLength:]
 
 	return nil
 }
