@@ -11,7 +11,7 @@ const tcpIdleTimeout time.Duration = 60 * time.Second //
 
 // Defaults UDP
 const udpMsgSize     int           = 508              // RFC 791 (Min IP Size - Max IP Header Size - UDP Header Size)
-const maxMsgSize     int           = 65535            // ToDo Set configurable?
+const maxMsgSize     int           = 65535            // Max Packet size, limited by uint16
 
 // Defaults Socket
 const rtimeout       time.Duration = 2 * time.Second  // Socket read timeout
