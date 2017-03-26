@@ -20,7 +20,7 @@ func NewServeMux() *ServeMux {
 
 func (mux *ServeMux) Handle(pattern string, handler Handler) {
 	if pattern == "" {
-		panic("dns: invalid pattern " + pattern)
+		log.Crit("socket mux invalid pattern " + pattern)
 	}
 
 	mux.m.Lock()
@@ -34,7 +34,7 @@ func (mux *ServeMux) HandleFunc(pattern string, handler func(Response, *Msg)) {
 
 func (mux *ServeMux) HandleRemove(pattern string) {
 	if pattern == "" {
-		panic("dns: invalid pattern " + pattern)
+		log.Crit("socket mux invalid pattern " + pattern)
 	}
 	mux.m.Lock()
 	delete(mux.h, pattern)

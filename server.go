@@ -86,8 +86,7 @@ func (srv *Server) ListenAndServe() error {
 func (srv *Server) serveTCP(l net.Listener) error {
 	defer l.Close()
 
-	reader := Reader(&defaultReader{srv})
-
+	reader  := Reader(&defaultReader{srv})
 	handler := srv.Handler
 	if handler == nil {
 		handler = DefaultServeMux
@@ -95,9 +94,10 @@ func (srv *Server) serveTCP(l net.Listener) error {
 
 	for {
 		rw, err := l.Accept()
+		log.Debugf("incomming TCP connection from: %s", rw.RemoteAddr())
 		if err != nil {
 			if neterr, ok := err.(net.Error); ok && neterr.Temporary() {
-				log.Errf("TCP Net ERR: %s", err)
+				log.Errf("TCP Network: %s", err)
 
 				continue
 			}
@@ -127,8 +127,7 @@ func (srv *Server) serveTCP(l net.Listener) error {
 func (srv *Server) serveUDP(l *net.UDPConn) error {
 	defer l.Close()
 
-	reader := Reader(&defaultReader{srv})
-
+	reader  := Reader(&defaultReader{srv})
 	handler := srv.Handler
 	if handler == nil {
 		handler = DefaultServeMux
@@ -136,6 +135,7 @@ func (srv *Server) serveUDP(l *net.UDPConn) error {
 
 	for {
 		m, s, err := reader.ReadUDP(l, rtimeout)
+		log.Debugf("Incomming UDP connection from: %s", s.RemoteAddr())
 		srv.lock.RLock()
 		if !srv.started {
 			srv.lock.RUnlock()
@@ -171,11 +171,10 @@ func (srv *Server) serve(a net.Addr, h Handler, m []byte, u *net.UDPConn, s *Ses
 	// Redo Label
 	Redo:
 	req := new(Msg)
-	sep := msgSep
-	if srv.MsgSep != 0 { sep = srv.MsgSep }
-	err := req.Unpack(m, sep)
+	err := req.Unpack(m)
 	if err != nil {
-		// ToDo Return some err
+		log.Err(err)
+
 		goto Exit
 	}
 
@@ -219,7 +218,6 @@ func (srv *Server) serve(a net.Addr, h Handler, m []byte, u *net.UDPConn, s *Ses
 	return
 }
 
-// ToDo add more specifics in errors
 func (srv *Server) readTCP(conn net.Conn, timeout time.Duration) ([]byte, error) {
 	conn.SetReadDeadline(time.Now().Add(timeout))
 
@@ -227,24 +225,23 @@ func (srv *Server) readTCP(conn net.Conn, timeout time.Duration) ([]byte, error)
 	n, err := conn.Read(l)
 	if err != nil || n != 2 {
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("Can't read packet size flag: %s", err)
 		}
 
-		return nil, errFlagSize
+		return nil, errPktFlag
 	}
 
 	length := binary.BigEndian.Uint16(l)
-	log.Debugf("TCP PKT length: %v", length)
+	log.Debugf("Incomming packet from: %v, length: %v", conn.RemoteAddr(), length)
 	if length == 0 {
-		return nil, errFlagLen
+		return nil, errPktLen
 	}
 
 	m := make([]byte, int(length))
 	n, err = conn.Read(m[:int(length)])
-	log.Debugf("Readed: %v TCP DATA: %v", n , m)
 	if err != nil || n == 0 {
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("Can't read packet: %s", err)
 		}
 
 		return nil, errDataRead
@@ -253,25 +250,23 @@ func (srv *Server) readTCP(conn net.Conn, timeout time.Duration) ([]byte, error)
 	i := n
 	for i < int(length) {
 		j, err := conn.Read(m[i:int(length)])
-		log.Debugf("J:%v", j)
 		if err != nil {
-			log.Debugf("Read TCP ERR: %v", err)
-			return nil, err
+			return nil, fmt.Errorf("Can't sort packet: %s", err)
 		}
 
 		i += j
-		log.Debugf("I:%v", i)
 	}
 
 	n = i
 	m = m[:n]
+	log.Debugf("Packet readed from %v, size: %v, data: %v", conn.RemoteAddr(), length, m)
 
 	return m, nil
 }
 
+// ToDo add more debug
 func (srv *Server) readUDP(conn *net.UDPConn, timeout time.Duration) ([]byte, *SessionUDP, error) {
-	// ToDo use UDPSize
-	m := make([]byte, 508)
+	m := make([]byte, udpMsgSize)
 	n, s, err := ReadFromSessionUDP(conn, m)
 	if err != nil || n == 0 {
 		if err != nil {

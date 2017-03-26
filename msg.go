@@ -1,61 +1,67 @@
 package socket
 
 import (
-	"errors"
 	"encoding/binary"
+	"errors"
 )
 
+// Main Msg structure
 type Msg struct {
-	Req  string
-	Data []byte
+	Req  string // Req - used like pattern for registered HandlerFunc
+	Data []byte // Effective data
 }
 
+// Raw Packet
 type Packet struct {
-	packetSize uint16 // full packet size
 	headerSize uint16 // header size
 	header     []byte // Header
 	data       []byte // Data
 }
 
-type packet struct {
-	size uint16 // packet size
-	data []byte // Operation
-}
-
-// Unpack binary message to Msq structure
-// s is are separator
-func (m *Msg) Unpack(data []byte, s byte) error {
-	if s == 0 {
-		return errors.New("Separator size oferflow, should be 1")
-	}
-
+// Unpack method - unpacking binary packet to Msq structure
+func (m *Msg) Unpack(data []byte) error {
 	headerLength := binary.BigEndian.Uint16(data[:2])
 	if headerLength == 0 {
 		return errHeaderLen
 	}
 
-	data = data[2:] // Remove header size from data
+	// Remove header size from data
+	data = data[2:]
 
 	// Unpack message
 	m.Req  = string(data[:headerLength])
-	// ToDo Test it
 	m.Data = data[headerLength:]
 
 	return nil
 }
 
+// Pack method - packing data to binary packet
 func (m *Msg) Pack() ([]byte, error) {
-	rawData := append([]byte(""), []byte(m.Req)...)
-	rawData = append(rawData, []byte("::")...)
-	rawData = append(rawData, m.Data...)
-	l := len(rawData)
-	pkt := &packet{size: uint16(l), data: rawData}
+	// Preparing packet
+	hdr     := []byte(m.Req)
+	hdrSize := len(hdr)
+	pktSize := hdrSize + len(m.Data)
+	pkt := &Packet{
+		headerSize: uint16(hdrSize),
+		header:     hdr,
+		data:       m.Data,
+	}
 
-	var buf []byte = make([]byte, 2 + l)
+	// Creating packet with size 2 bytes total size + 2 bytes header size + size header + data
+	var buf []byte = make([]byte, 4 + pktSize)
+	// Put total packet size
 	offset := 0
-	binary.BigEndian.PutUint16(buf[offset:], pkt.size)
+	binary.BigEndian.PutUint16(buf[offset:], pkt.headerSize)
+	// Put header
 	offset += 2
-	copy(buf[offset:], pkt.data)
+	if n := copy(buf[offset:], hdr); n == 0 {
+		return nil, errors.New("Can't pack header to packet")
+	}
+	// Put data
+	offset += hdrSize
+	if n := copy(buf[offset:], pkt.data); n == 0 {
+		return nil, errors.New("Can't pack data to packet")
+	}
 
 	return buf, nil
 }

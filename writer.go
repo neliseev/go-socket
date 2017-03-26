@@ -39,7 +39,7 @@ func (w *response) Write(m []byte) (int, error) {
 		if lm < 2 {
 			return 0, io.ErrShortBuffer
 		}
-		// ToDo set configurable maxMsgSize
+
 		if lm > maxMsgSize {
 			return 0, errMsgLarge
 		}
