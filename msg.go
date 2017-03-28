@@ -5,13 +5,13 @@ import (
 	"errors"
 )
 
-// Main Msg structure
+// Msg is are message structure
 type Msg struct {
 	Req  string // Req - used like pattern for registered HandlerFunc
-	Data []byte // Effective data
+	Data []byte // Data - any data
 }
 
-// Raw Packet
+// Packet - raw packet
 type Packet struct {
 	headerSize uint16 // header size
 	header     []byte // Header
