@@ -2,8 +2,8 @@
 # Binaries for programs and plugins
 /bin/
 /pkg/
-/vendor/
-!/vendor/vendor.json
+/vendor/github.com
+
 
 # Test binary, build with `go test -c`
 *.test
