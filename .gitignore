@@ -1,15 +1,19 @@
-### Go template
-# Binaries for programs and plugins
+### Golang excluded paths
+/.cache/
 /bin/
 /pkg/
-/vendor/github.com
-
+/var/
 
 # Test binary, build with `go test -c`
 *.test
 
-### IntelliJ project files
-.idea
+### OSX ENV excluded paths
+.DS_Stores
+
+### IDEA excluded paths
+out/*
 *.iml
-out
-gen
+/.idea/
+
+### Vendors
+/vendor/github.com/
