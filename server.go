@@ -1,12 +1,12 @@
 package socket
 
 import (
+	"encoding/binary"
 	"errors"
+	"fmt"
 	"net"
 	"sync"
-	"fmt"
 	"time"
-	"encoding/binary"
 )
 
 type Server struct {
@@ -14,9 +14,9 @@ type Server struct {
 	Proto         string
 	ListenerTCP   net.Listener
 	IdleTimeout   time.Duration
-	MaxTCPQueries int            //
+	MaxTCPQueries int //
 	ListenerUDP   net.PacketConn
-	UDPSize       int            // Default 508 byte by RFC 791 (minimal IP length is are 576 byte)
+	UDPSize       int // Default 508 byte by RFC 791 (minimal IP length is are 576 byte)
 	Handler       Handler
 	MsgSep        byte           // Separator
 	running       sync.WaitGroup //
@@ -86,7 +86,7 @@ func (srv *Server) ListenAndServe() error {
 func (srv *Server) serveTCP(l net.Listener) error {
 	defer l.Close()
 
-	reader  := Reader(&defaultReader{srv})
+	reader := Reader(&defaultReader{srv})
 	handler := srv.Handler
 	if handler == nil {
 		handler = DefaultServeMux
@@ -127,7 +127,7 @@ func (srv *Server) serveTCP(l net.Listener) error {
 func (srv *Server) serveUDP(l *net.UDPConn) error {
 	defer l.Close()
 
-	reader  := Reader(&defaultReader{srv})
+	reader := Reader(&defaultReader{srv})
 	handler := srv.Handler
 	if handler == nil {
 		handler = DefaultServeMux
@@ -159,8 +159,8 @@ func (srv *Server) serve(a net.Addr, h Handler, m []byte, u *net.UDPConn, s *Ses
 
 	reader := Reader(&defaultReader{srv})
 	writer := &response{
-		udp: u,
-		tcp: t,
+		udp:        u,
+		tcp:        t,
 		remoteAddr: a,
 	}
 
@@ -169,7 +169,7 @@ func (srv *Server) serve(a net.Addr, h Handler, m []byte, u *net.UDPConn, s *Ses
 
 	////
 	// Redo Label
-	Redo:
+Redo:
 	req := new(Msg)
 	err := req.Unpack(m)
 	if err != nil {
@@ -182,14 +182,16 @@ func (srv *Server) serve(a net.Addr, h Handler, m []byte, u *net.UDPConn, s *Ses
 
 	////
 	// Exit Label
-	Exit:
+Exit:
 	if writer.tcp == nil {
 		return
 	}
 
 	// close socket after this many queries
 	maxQueries := maxTCPQueries
-	if srv.MaxTCPQueries != 0 { maxQueries = srv.MaxTCPQueries }
+	if srv.MaxTCPQueries != 0 {
+		maxQueries = srv.MaxTCPQueries
+	}
 	if q > maxQueries {
 		writer.Close()
 		return
@@ -308,7 +310,7 @@ func (srv *Server) Shutdown() error {
 
 	select {
 	case <-time.After(rtimeout):
-	// ToDO: try kill it?
+		// ToDO: try kill it?
 		return errors.New("Can't stop server")
 	case <-f:
 		return nil

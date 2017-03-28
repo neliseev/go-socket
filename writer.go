@@ -1,10 +1,10 @@
 package socket
 
 import (
+	"bytes"
+	"encoding/binary"
 	"io"
 	"net"
-	"encoding/binary"
-	"bytes"
 )
 
 type Writer interface {
@@ -12,21 +12,20 @@ type Writer interface {
 }
 
 type Response interface {
-	LocalAddr()    net.Addr     // LocalAddr returns net.Addr of the server
-	RemoteAddr()   net.Addr     // RemoteAddr returns net.Addr of client that sent the current request.
-	WriteMsg(*Msg) error        // WriteMsg writes a reply back to the client.
-	Write([]byte)  (int, error) // Write writes a raw buffer back to the client.
-	Close() error               // Close closes the connection.
+	LocalAddr() net.Addr       // LocalAddr returns net.Addr of the server
+	RemoteAddr() net.Addr      // RemoteAddr returns net.Addr of client that sent the current request.
+	WriteMsg(*Msg) error       // WriteMsg writes a reply back to the client.
+	Write([]byte) (int, error) // Write writes a raw buffer back to the client.
+	Close() error              // Close closes the connection.
 }
 
 type response struct {
-	udp            *net.UDPConn      // i/o connection if UDP was used
-	tcp            net.Conn          // i/o connection if TCP was used
-	udpSession     *SessionUDP       // oob data to get egress interface right
-	remoteAddr     net.Addr          // address of the client
-	writer         Writer            // writer to output
+	udp        *net.UDPConn // i/o connection if UDP was used
+	tcp        net.Conn     // i/o connection if TCP was used
+	udpSession *SessionUDP  // oob data to get egress interface right
+	remoteAddr net.Addr     // address of the client
+	writer     Writer       // writer to output
 }
-
 
 func (w *response) Write(m []byte) (int, error) {
 	switch {
