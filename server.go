@@ -14,9 +14,9 @@ type Server struct {
 	Proto         string
 	ListenerTCP   net.Listener
 	IdleTimeout   time.Duration
-	MaxTCPQueries int            //
+	MaxTCPQueries int //
 	ListenerUDP   net.PacketConn
-	UDPSize       int            // UDPSize is default 508 byte by RFC 791 (minimal IP length is are 576 byte)
+	UDPSize       int // UDPSize is default 508 byte by RFC 791 (minimal IP length is are 576 byte)
 	Handler       Handler
 	running       sync.WaitGroup //
 	lock          sync.RWMutex

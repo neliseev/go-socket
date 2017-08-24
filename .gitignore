@@ -1,19 +1,41 @@
-### Golang excluded paths
-/.cache/
+### Golang
+# Compiled Object files, Static and Dynamic libs (Shared Objects)
+*.o
+*.a
+
+### Folders
+_obj
+_test
+
+### Architecture specific extensions/prefixes
+*.[568vq]
+[568vq].out
+
+*.cgo1.go
+*.cgo2.c
+_cgo_defun.c
+_cgo_gotypes.go
+_cgo_export.*
+
+_testmain.go
+
+*.exe
+*.test
+*.prof
+
+### Golang Project specific
 /bin/
 /pkg/
-/var/
 
-# Test binary, build with `go test -c`
-*.test
+### Golang Vendors
+glide.lock
+vendor/
+
+### IDEA
+out/
+.idea/
+*.iml
 
 ### OSX ENV excluded paths
+*.swp
 .DS_Stores
-
-### IDEA excluded paths
-out/*
-*.iml
-/.idea/
-
-### Vendors
-/vendor/github.com/

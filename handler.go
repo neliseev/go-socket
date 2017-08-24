@@ -31,7 +31,7 @@ func HandleRemove(pattern string) {
 // HandleFailed func - return SERVEFAIL for every requests
 func HandleFailed(w Response, r *Msg) {
 	m := new(Msg)
-	m.Req  = ""
+	m.Req = ""
 	m.Data = []byte("SERVFAIL")
 
 	w.WriteMsg(m)

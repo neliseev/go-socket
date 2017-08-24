@@ -1,0 +1,3 @@
+package: socket
+import:
+- package: github.com/neliseev/logger

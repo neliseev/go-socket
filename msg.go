@@ -29,7 +29,7 @@ func (m *Msg) Unpack(data []byte) error {
 	data = data[2:]
 
 	// Unpack message
-	m.Req  = string(data[:headerLength])
+	m.Req = string(data[:headerLength])
 	m.Data = data[headerLength:]
 
 	return nil
@@ -38,7 +38,7 @@ func (m *Msg) Unpack(data []byte) error {
 // Pack method - packing data to binary packet
 func (m *Msg) Pack() ([]byte, error) {
 	// Preparing packet
-	hdr     := []byte(m.Req)
+	hdr := []byte(m.Req)
 	hdrSize := len(hdr)
 	pktSize := hdrSize + len(m.Data)
 	pkt := &Packet{
@@ -48,7 +48,7 @@ func (m *Msg) Pack() ([]byte, error) {
 	}
 
 	// Creating packet with size 2 bytes total size + 2 bytes header size + size header + data
-	var buf []byte = make([]byte, 4 + pktSize)
+	var buf []byte = make([]byte, 4+pktSize)
 	// Put total packet size
 	offset := 0
 	binary.BigEndian.PutUint16(buf[offset:], pkt.headerSize)
