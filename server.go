@@ -28,7 +28,7 @@ func (srv *Server) ListenAndServe() error {
 	defer srv.lock.Unlock()
 
 	if srv.started {
-		return errors.New("Socket server already started")
+		return errors.New("socket server already started")
 	}
 
 	addr := srv.Addr
@@ -38,6 +38,8 @@ func (srv *Server) ListenAndServe() error {
 
 	switch srv.Proto {
 	case "tcp", "tcp4", "tcp6":
+		var err error
+
 		a, err := net.ResolveTCPAddr(srv.Proto, addr)
 		if err != nil {
 			return err
@@ -45,19 +47,21 @@ func (srv *Server) ListenAndServe() error {
 
 		l, err := net.ListenTCP(srv.Proto, a)
 		if err != nil {
-			return fmt.Errorf("Socket server ListenTCP: %s", err)
+			return fmt.Errorf("socket server ListenTCP: %s", err)
 		}
 
 		srv.ListenerTCP = l
 		srv.started = true
 		srv.lock.Unlock()
-		if err := srv.serveTCP(l); err != nil {
+		if err = srv.serveTCP(l); err != nil {
 			return err
 		}
 		srv.lock.Lock()
 
 		return nil
 	case "udp", "udp4", "udp6":
+		var err error
+
 		a, err := net.ResolveUDPAddr(srv.Proto, addr)
 		if err != nil {
 			return err
@@ -65,20 +69,20 @@ func (srv *Server) ListenAndServe() error {
 
 		l, err := net.ListenUDP(srv.Proto, a)
 		if err != nil {
-			return fmt.Errorf("Socket server ListenUDP: %s", err)
+			return fmt.Errorf("socket server ListenUDP: %s", err)
 		}
 
 		srv.ListenerUDP = l
 		srv.started = true
 		srv.lock.Unlock()
-		if err := srv.serveUDP(l); err != nil {
+		if err = srv.serveUDP(l); err != nil {
 			return err
 		}
 		srv.lock.Lock()
 
-		return err
+		return nil
 	default:
-		return fmt.Errorf("Socket can't start server, incorrect proto: %s", srv.Proto)
+		return fmt.Errorf("socket can't start server, incorrect proto: %s", srv.Proto)
 	}
 }
 
@@ -226,14 +230,14 @@ func (srv *Server) readTCP(conn net.Conn, timeout time.Duration) ([]byte, error)
 	n, err := conn.Read(l)
 	if err != nil || n != 2 {
 		if err != nil {
-			return nil, fmt.Errorf("Can't read packet size flag: %s", err)
+			return nil, fmt.Errorf("can't read packet size flag: %s", err)
 		}
 
 		return nil, errPktFlag
 	}
 
 	length := binary.BigEndian.Uint16(l)
-	log.Debugf("Incomming packet from: %v, length: %v", conn.RemoteAddr(), length)
+	log.Debugf("Incoming packet from: %v, length: %v", conn.RemoteAddr(), length)
 	if length == 0 {
 		return nil, errPktLen
 	}
@@ -242,7 +246,7 @@ func (srv *Server) readTCP(conn net.Conn, timeout time.Duration) ([]byte, error)
 	n, err = conn.Read(m[:int(length)])
 	if err != nil || n == 0 {
 		if err != nil {
-			return nil, fmt.Errorf("Can't read packet: %s", err)
+			return nil, fmt.Errorf("can't read packet: %s", err)
 		}
 
 		return nil, errDataRead
@@ -250,9 +254,9 @@ func (srv *Server) readTCP(conn net.Conn, timeout time.Duration) ([]byte, error)
 
 	i := n
 	for i < int(length) {
-		j, err := conn.Read(m[i:int(length)])
-		if err != nil {
-			return nil, fmt.Errorf("Can't sort packet: %s", err)
+		j, e := conn.Read(m[i:int(length)])
+		if e != nil {
+			return nil, fmt.Errorf("can't sort packet: %s", e)
 		}
 
 		i += j
@@ -260,7 +264,7 @@ func (srv *Server) readTCP(conn net.Conn, timeout time.Duration) ([]byte, error)
 
 	n = i
 	m = m[:n]
-	log.Debugf("Packet readed from %v, size: %v, data: %v", conn.RemoteAddr(), length, m)
+	log.Debugf("Packet was read from %v, size: %v, data: %v", conn.RemoteAddr(), length, m)
 
 	return m, nil
 }
@@ -285,7 +289,7 @@ func (srv *Server) Shutdown() error {
 	if !srv.started {
 		srv.lock.Unlock()
 
-		return errors.New("Socket server not started")
+		return errors.New("socket server not started")
 	}
 	srv.started = false
 	srv.lock.Unlock()
@@ -310,7 +314,7 @@ func (srv *Server) Shutdown() error {
 	select {
 	case <-time.After(rtimeout):
 		// ToDO: try kill it?
-		return errors.New("Can't stop server")
+		return errors.New("can't stop server")
 	case <-f:
 		return nil
 	}

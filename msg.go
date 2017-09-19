@@ -55,12 +55,12 @@ func (m *Msg) Pack() ([]byte, error) {
 	// Put header
 	offset += 2
 	if n := copy(buf[offset:], hdr); n == 0 {
-		return nil, errors.New("Can't pack header to packet")
+		return nil, errors.New("can't pack header to packet")
 	}
 	// Put data
 	offset += hdrSize
 	if n := copy(buf[offset:], pkt.data); n == 0 {
-		return nil, errors.New("Can't pack data to packet")
+		return nil, errors.New("can't pack data to packet")
 	}
 
 	return buf, nil

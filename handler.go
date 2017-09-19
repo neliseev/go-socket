@@ -29,10 +29,10 @@ func HandleRemove(pattern string) {
 }
 
 // HandleFailed func - return SERVEFAIL for every requests
-func HandleFailed(w Response, r *Msg) {
+func HandleFailed(w Response, _ *Msg) {
 	m := new(Msg)
 	m.Req = ""
-	m.Data = []byte("SERVFAIL")
+	m.Data = []byte("SERVEFAIL")
 
 	w.WriteMsg(m)
 }

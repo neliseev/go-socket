@@ -5,23 +5,21 @@ import (
 	"time"
 )
 
-// Defaults TCP
-const maxTCPQueries int = 256
-const tcpIdleTimeout time.Duration = 60 * time.Second //
+const maxTCPQueries int = 256                         // maximum tcp queries
+const tcpIdleTimeout time.Duration = 60 * time.Second // How much keep tcp socket open
 
-// Defaults UDP
 const udpMsgSize int = 508   // RFC 791 (Min IP Size - Max IP Header Size - UDP Header Size)
 const maxMsgSize int = 65535 // Max Packet size, limited by uint16
 
-// Defaults Socket
 const rtimeout time.Duration = 2 * time.Second // Socket read timeout
 
-// Init logger subsystem
-var log *logger.Params
+var log *logger.Log // Using log subsystem
 
 func init() {
 	// Initialization log system
-	if err := logger.NewLogger(&logger.Params{}); err != nil {
-		log.Critf("Can't init log subsystem: %s", err)
+	var err error
+
+	if log, err = logger.NewFileLogger("", 8); err != nil {
+		panic(err)
 	}
 }
