@@ -4,85 +4,152 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"github.com/neliseev/logger"
 	"net"
 	"sync"
 	"time"
 )
 
+var log *logger.Log // Using log subsystem
+
+func init() {
+	// Initialization log system
+	var err error
+
+	if log, err = logger.NewFileLogger("", 8); err != nil {
+		panic(err)
+	}
+}
+
+const sockReadTimeout time.Duration = 2 * time.Second        // Socket read timeout
+const defaultProtocol string = "tcp"                         // Default protocol for server
+const defaultTCPIdleTimeout time.Duration = 60 * time.Second // How much keep tcp socket open
+const defaultTCPMaxQueries int = 256                         // Max tcp queries
+const defaultTCPMaxPacketSize int = 65535                        // Max TCP Packet size, limited by uint16
+const defaultUDPMaxPacketSize int = 508                          // RFC 791 (Min IP Size - Max IP Header Size - UDP Header Size)
+
+var tcpMaxPacketSize int
+
+type Params struct {
+	Addr             string
+	Proto            string
+	TCPIdleTimeout   time.Duration
+	TCPMaxQueries    int
+	TCPMaxPacketSize int
+	UDPMaxPacketSize int
+}
+
+func NewServer(p *Params) *Server {
+	address := p.Addr
+	if address == "" {
+		address = ":2017"
+	}
+
+	protocol := p.Proto
+	if protocol == "" {
+		protocol = defaultProtocol
+	}
+
+	tcpIdleTimeout := p.TCPIdleTimeout
+	if tcpIdleTimeout == 0 {
+		tcpIdleTimeout = defaultTCPIdleTimeout
+	}
+
+	tcpMaxQueries := p.TCPMaxQueries
+	if tcpMaxQueries == 0 {
+		tcpMaxQueries = defaultTCPMaxQueries
+	}
+
+	tcpMaxPacketSize = p.TCPMaxPacketSize
+	if tcpMaxPacketSize == 0 || tcpMaxPacketSize > defaultTCPMaxPacketSize {
+		tcpMaxPacketSize = defaultTCPMaxPacketSize
+	}
+
+	udpMaxPacketSize := p.UDPMaxPacketSize
+	if udpMaxPacketSize == 0 || udpMaxPacketSize > defaultUDPMaxPacketSize {
+		udpMaxPacketSize = defaultUDPMaxPacketSize
+	}
+
+	return &Server{
+		addr:  address,
+		proto: protocol,
+		tcpIdleTimeout: tcpIdleTimeout,
+		tcpMaxQueries: tcpMaxQueries,
+		tcpPacketSize: tcpMaxPacketSize,
+		udpPacketSize: udpMaxPacketSize,
+	}
+}
+
 type Server struct {
-	Addr          string
-	Proto         string
-	ListenerTCP   net.Listener
-	IdleTimeout   time.Duration
-	MaxTCPQueries int //
-	ListenerUDP   net.PacketConn
-	UDPSize       int // UDPSize is default 508 byte by RFC 791 (minimal IP length is are 576 byte)
-	Handler       Handler
-	running       sync.WaitGroup //
-	lock          sync.RWMutex
-	started       bool
+	Handler        Handler
+	addr           string
+	proto          string
+	tcpIdleTimeout time.Duration
+	tcpMaxQueries  int
+	tcpPacketSize  int
+	udpPacketSize  int
+	listenerTCP    net.Listener
+	listenerUDP    net.PacketConn
+	inFlight       sync.WaitGroup
+	started        bool
+	sync.RWMutex
 }
 
 func (srv *Server) ListenAndServe() error {
-	srv.lock.Lock()
-	defer srv.lock.Unlock()
+	srv.Lock()
+	defer srv.Unlock()
 
 	if srv.started {
 		return errors.New("socket server already started")
 	}
 
-	addr := srv.Addr
-	if addr == "" {
-		addr = ":2017"
-	}
-
-	switch srv.Proto {
+	switch srv.proto {
 	case "tcp", "tcp4", "tcp6":
 		var err error
 
-		a, err := net.ResolveTCPAddr(srv.Proto, addr)
+		a, err := net.ResolveTCPAddr(srv.proto, srv.addr)
 		if err != nil {
 			return err
 		}
 
-		l, err := net.ListenTCP(srv.Proto, a)
+		l, err := net.ListenTCP(srv.proto, a)
 		if err != nil {
 			return fmt.Errorf("socket server ListenTCP: %s", err)
 		}
 
-		srv.ListenerTCP = l
+		srv.listenerTCP = l
 		srv.started = true
-		srv.lock.Unlock()
+		srv.Unlock()
 		if err = srv.serveTCP(l); err != nil {
 			return err
 		}
-		srv.lock.Lock()
+		srv.Lock()
 
 		return nil
 	case "udp", "udp4", "udp6":
 		var err error
 
-		a, err := net.ResolveUDPAddr(srv.Proto, addr)
+		a, err := net.ResolveUDPAddr(srv.proto, srv.addr)
 		if err != nil {
 			return err
 		}
 
-		l, err := net.ListenUDP(srv.Proto, a)
+		l, err := net.ListenUDP(srv.proto, a)
 		if err != nil {
 			return fmt.Errorf("socket server ListenUDP: %s", err)
 		}
 
-		srv.ListenerUDP = l
+		srv.listenerUDP = l
 		srv.started = true
-		srv.lock.Unlock()
+		srv.Unlock()
 		if err = srv.serveUDP(l); err != nil {
 			return err
 		}
-		srv.lock.Lock()
+		srv.Lock()
 
 		return nil
 	default:
-		return fmt.Errorf("socket can't start server, incorrect proto: %s", srv.Proto)
+		return fmt.Errorf("socket server, can't start, incorrect proto: %s", srv.proto)
 	}
 }
 
@@ -97,32 +164,30 @@ func (srv *Server) serveTCP(l net.Listener) error {
 
 	for {
 		rw, err := l.Accept()
-		log.Debugf("incomming TCP connection from: %s", rw.RemoteAddr())
+		srv.RLock()
+		if !srv.started {
+			return nil
+		}
+		srv.RUnlock()
 		if err != nil {
 			if neterr, ok := err.(net.Error); ok && neterr.Temporary() {
-				log.Errf("TCP Network: %s", err)
+				log.Errf("Socket server: TCP Network: %s", err)
 
 				continue
 			}
 
 			return err
 		}
+		log.Debugf("Socket server, incoming tcp connection from: %s", rw.RemoteAddr())
 
-		m, err := reader.ReadTCP(rw, rtimeout)
-		srv.lock.RLock()
-		if !srv.started {
-			srv.lock.RUnlock()
-
-			return nil
-		}
-		srv.lock.RUnlock()
+		m, err := reader.ReadTCP(rw, sockReadTimeout)
 		if err != nil {
-			log.Errf("Socket Serve TCP: %s", err)
+			log.Errf("Socket server, read tcp: %s", err)
 
 			continue
 		}
 
-		srv.running.Add(1)
+		srv.inFlight.Add(1)
 		go srv.serve(rw.RemoteAddr(), handler, m, nil, nil, rw)
 	}
 }
@@ -137,28 +202,26 @@ func (srv *Server) serveUDP(l *net.UDPConn) error {
 	}
 
 	for {
-		m, s, err := reader.ReadUDP(l, rtimeout)
-		log.Debugf("Incomming UDP connection from: %s", s.RemoteAddr())
-		srv.lock.RLock()
+		m, s, err := reader.ReadUDP(l, sockReadTimeout)
+		srv.RLock()
 		if !srv.started {
-			srv.lock.RUnlock()
-
 			return nil
 		}
-		srv.lock.RUnlock()
+		srv.RUnlock()
 		if err != nil {
-			log.Errf("Socket Serve UDP: %s", err)
+			log.Errf("Socket server, read udp: %s", err)
 
 			continue
 		}
+		log.Debugf("Socket server, incoming UDP connection from: %s", s.RemoteAddr())
 
-		srv.running.Add(1)
+		srv.inFlight.Add(1)
 		go srv.serve(s.RemoteAddr(), handler, m, l, nil, nil)
 	}
 }
 
 func (srv *Server) serve(a net.Addr, h Handler, m []byte, u *net.UDPConn, s *SessionUDP, t net.Conn) {
-	defer srv.running.Done()
+	defer srv.inFlight.Done()
 
 	reader := Reader(&defaultReader{srv})
 	writer := &response{
@@ -191,11 +254,7 @@ Exit:
 	}
 
 	// close socket after this many queries
-	maxQueries := maxTCPQueries
-	if srv.MaxTCPQueries != 0 {
-		maxQueries = srv.MaxTCPQueries
-	}
-	if q > maxQueries {
+	if q > srv.tcpMaxQueries {
 		writer.Close()
 		return
 	}
@@ -206,12 +265,7 @@ Exit:
 		return
 	}
 
-	idleTimeout := tcpIdleTimeout
-	if srv.IdleTimeout != 0 {
-		idleTimeout = srv.IdleTimeout
-	}
-
-	m, err = reader.ReadTCP(writer.tcp, idleTimeout)
+	m, err = reader.ReadTCP(writer.tcp, srv.tcpIdleTimeout)
 	if err == nil {
 		q++
 
@@ -237,7 +291,7 @@ func (srv *Server) readTCP(conn net.Conn, timeout time.Duration) ([]byte, error)
 	}
 
 	length := binary.BigEndian.Uint16(l)
-	log.Debugf("Incoming packet from: %v, length: %v", conn.RemoteAddr(), length)
+	log.Debugf("Incoming tcp packet from: %v, length: %v", conn.RemoteAddr(), length)
 	if length == 0 {
 		return nil, errPktLen
 	}
@@ -264,14 +318,14 @@ func (srv *Server) readTCP(conn net.Conn, timeout time.Duration) ([]byte, error)
 
 	n = i
 	m = m[:n]
-	log.Debugf("Packet was read from %v, size: %v, data: %v", conn.RemoteAddr(), length, m)
+	log.Debugf("tcp packet was read from %v, size: %v, data: %v", conn.RemoteAddr(), length, m)
 
 	return m, nil
 }
 
-// ToDo add more debug
 func (srv *Server) readUDP(conn *net.UDPConn, timeout time.Duration) ([]byte, *SessionUDP, error) {
-	m := make([]byte, udpMsgSize)
+	log.Debugf("Socket server, incoming udp packet from: %v", conn.RemoteAddr())
+	m := make([]byte, srv.udpPacketSize)
 	n, s, err := ReadFromSessionUDP(conn, m)
 	if err != nil || n == 0 {
 		if err != nil {
@@ -280,41 +334,41 @@ func (srv *Server) readUDP(conn *net.UDPConn, timeout time.Duration) ([]byte, *S
 		return nil, nil, errDataRead
 	}
 	m = m[:n]
+	log.Debugf("Socket server, udp packet was read from %v, data: %v", conn.RemoteAddr(), m)
 
 	return m, s, nil
 }
 
 func (srv *Server) Shutdown() error {
-	srv.lock.Lock()
+	srv.Lock()
 	if !srv.started {
-		srv.lock.Unlock()
+		srv.Unlock()
 
 		return errors.New("socket server not started")
 	}
 	srv.started = false
-	srv.lock.Unlock()
+	srv.Unlock()
 
 	// Close UDP
-	if srv.ListenerUDP != nil {
-		srv.ListenerUDP.Close()
+	if srv.listenerUDP != nil {
+		srv.listenerUDP.Close()
 	}
 
 	// Close TCP
-	if srv.ListenerTCP != nil {
-		srv.ListenerTCP.Close()
+	if srv.listenerTCP != nil {
+		srv.listenerTCP.Close()
 	}
 
 	// Finalizing all active connections
 	f := make(chan bool)
 	go func() {
-		srv.running.Wait()
+		srv.inFlight.Wait()
 		f <- true
 	}()
 
 	select {
-	case <-time.After(rtimeout):
-		// ToDO: try kill it?
-		return errors.New("can't stop server")
+	case <-time.After(sockReadTimeout):
+		return errors.New("can't stop socket server")
 	case <-f:
 		return nil
 	}

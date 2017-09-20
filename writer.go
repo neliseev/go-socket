@@ -39,7 +39,7 @@ func (w *response) Write(m []byte) (int, error) {
 			return 0, io.ErrShortBuffer
 		}
 
-		if lm > maxMsgSize {
+		if lm > tcpMaxPacketSize {
 			return 0, errMsgLarge
 		}
 
