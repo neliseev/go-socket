@@ -30,9 +30,9 @@ type response struct {
 func (w *response) Write(m []byte) (int, error) {
 	switch {
 	case w.udp != nil:
-		n, err := WriteToSessionUDP(w.udp, m, w.udpSession)
+		log.Debugf("Writing UDP response to: %+s", w.remoteAddr)
 
-		return n, err
+		return WriteToSessionUDP(w.udp, m, w.udpSession)
 	case w.tcp != nil:
 		lm := len(m)
 		if lm < 2 {
@@ -47,6 +47,7 @@ func (w *response) Write(m []byte) (int, error) {
 		binary.BigEndian.PutUint16(l, uint16(lm))
 		m = append(l, m...)
 
+		log.Debugf("Writing TCP response to: %+s", w.remoteAddr)
 		n, err := io.Copy(w.tcp, bytes.NewReader(m))
 
 		return int(n), err

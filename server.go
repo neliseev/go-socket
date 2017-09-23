@@ -21,12 +21,12 @@ func init() {
 	}
 }
 
-const sockReadTimeout time.Duration = 2 * time.Second        // Socket read timeout
+const sockReadTimeout time.Duration = 60 * time.Second       // Socket read timeout
 const defaultProtocol string = "tcp"                         // Default protocol for server
 const defaultTCPIdleTimeout time.Duration = 60 * time.Second // How much keep tcp socket open
 const defaultTCPMaxQueries int = 256                         // Max tcp queries
-const defaultTCPMaxPacketSize int = 65535                        // Max TCP Packet size, limited by uint16
-const defaultUDPMaxPacketSize int = 508                          // RFC 791 (Min IP Size - Max IP Header Size - UDP Header Size)
+const defaultTCPMaxPacketSize int = 65535                    // Max TCP Packet size, limited by uint16
+const defaultUDPMaxPacketSize int = 508                      // RFC 791 (Min IP Size - Max IP Header Size - UDP Header Size)
 
 var tcpMaxPacketSize int
 
@@ -71,12 +71,12 @@ func NewServer(p *Params) *Server {
 	}
 
 	return &Server{
-		addr:  address,
-		proto: protocol,
+		addr:           address,
+		proto:          protocol,
 		tcpIdleTimeout: tcpIdleTimeout,
-		tcpMaxQueries: tcpMaxQueries,
-		tcpPacketSize: tcpMaxPacketSize,
-		udpPacketSize: udpMaxPacketSize,
+		tcpMaxQueries:  tcpMaxQueries,
+		tcpPacketSize:  tcpMaxPacketSize,
+		udpPacketSize:  udpMaxPacketSize,
 	}
 }
 
@@ -169,6 +169,7 @@ func (srv *Server) serveTCP(l net.Listener) error {
 			return nil
 		}
 		srv.RUnlock()
+		log.Debugf("Socket server, incoming TCP connection from: %s", rw.RemoteAddr())
 		if err != nil {
 			if neterr, ok := err.(net.Error); ok && neterr.Temporary() {
 				log.Errf("Socket server: TCP Network: %s", err)
@@ -178,7 +179,6 @@ func (srv *Server) serveTCP(l net.Listener) error {
 
 			return err
 		}
-		log.Debugf("Socket server, incoming tcp connection from: %s", rw.RemoteAddr())
 
 		m, err := reader.ReadTCP(rw, sockReadTimeout)
 		if err != nil {
@@ -208,12 +208,12 @@ func (srv *Server) serveUDP(l *net.UDPConn) error {
 			return nil
 		}
 		srv.RUnlock()
+		log.Debugf("Socket server, incoming UDP connection from: %s", l.RemoteAddr())
 		if err != nil {
 			log.Errf("Socket server, read udp: %s", err)
 
 			continue
 		}
-		log.Debugf("Socket server, incoming UDP connection from: %s", s.RemoteAddr())
 
 		srv.inFlight.Add(1)
 		go srv.serve(s.RemoteAddr(), handler, m, l, nil, nil)
@@ -318,7 +318,7 @@ func (srv *Server) readTCP(conn net.Conn, timeout time.Duration) ([]byte, error)
 
 	n = i
 	m = m[:n]
-	log.Debugf("tcp packet was read from %v, size: %v, data: %v", conn.RemoteAddr(), length, m)
+	defer log.Debugf("tcp packet was read from %v, size: %v", conn.RemoteAddr(), length, m)
 
 	return m, nil
 }
@@ -326,28 +326,28 @@ func (srv *Server) readTCP(conn net.Conn, timeout time.Duration) ([]byte, error)
 func (srv *Server) readUDP(conn *net.UDPConn, timeout time.Duration) ([]byte, *SessionUDP, error) {
 	m := make([]byte, srv.udpPacketSize)
 	n, s, err := ReadFromSessionUDP(conn, m)
-	log.Debugf("Socket server, incoming udp packet from: %v", s.RemoteAddr())
 	if err != nil || n == 0 {
 		if err != nil {
 			return nil, nil, err
 		}
 		return nil, nil, errDataRead
 	}
+	log.Debugf("Socket server, incoming udp packet from: %v", s.RemoteAddr())
+
 	m = m[:n]
-	log.Debugf("Socket server, udp packet was read from %v, data: %v", s.RemoteAddr(), m)
+	defer log.Debugf("Socket server, udp packet was read from %v", s.RemoteAddr())
 
 	return m, s, nil
 }
 
-func (srv *Server) Shutdown() error {
+func (srv *Server) Shutdown() (err error) {
 	srv.Lock()
-	if !srv.started {
-		srv.Unlock()
+	defer srv.Unlock()
 
+	if !srv.started {
 		return errors.New("socket server not started")
 	}
 	srv.started = false
-	srv.Unlock()
 
 	// Close UDP
 	if srv.listenerUDP != nil {

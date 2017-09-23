@@ -20,6 +20,8 @@ type Packet struct {
 
 // Unpack method - unpacking binary packet to Msq structure
 func (m *Msg) Unpack(data []byte) error {
+	defer log.Debugf("Message, unpacked: %#v", m)
+
 	headerLength := binary.BigEndian.Uint16(data[:2])
 	if headerLength == 0 {
 		return errHeaderLen
@@ -37,6 +39,8 @@ func (m *Msg) Unpack(data []byte) error {
 
 // Pack method - packing data to binary packet
 func (m *Msg) Pack() ([]byte, error) {
+	defer log.Debugf("Message, packing: %#v", m)
+
 	// Preparing packet
 	hdr := []byte(m.Req)
 	hdrSize := len(hdr)
