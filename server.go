@@ -324,9 +324,9 @@ func (srv *Server) readTCP(conn net.Conn, timeout time.Duration) ([]byte, error)
 }
 
 func (srv *Server) readUDP(conn *net.UDPConn, timeout time.Duration) ([]byte, *SessionUDP, error) {
-	log.Debugf("Socket server, incoming udp packet from: %v", conn.RemoteAddr())
 	m := make([]byte, srv.udpPacketSize)
 	n, s, err := ReadFromSessionUDP(conn, m)
+	log.Debugf("Socket server, incoming udp packet from: %v", s.RemoteAddr())
 	if err != nil || n == 0 {
 		if err != nil {
 			return nil, nil, err
@@ -334,7 +334,7 @@ func (srv *Server) readUDP(conn *net.UDPConn, timeout time.Duration) ([]byte, *S
 		return nil, nil, errDataRead
 	}
 	m = m[:n]
-	log.Debugf("Socket server, udp packet was read from %v, data: %v", conn.RemoteAddr(), m)
+	log.Debugf("Socket server, udp packet was read from %v, data: %v", s.RemoteAddr(), m)
 
 	return m, s, nil
 }
