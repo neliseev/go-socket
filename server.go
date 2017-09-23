@@ -169,7 +169,6 @@ func (srv *Server) serveTCP(l net.Listener) error {
 			return nil
 		}
 		srv.RUnlock()
-		log.Debugf("Socket server, incoming TCP connection from: %s", rw.RemoteAddr())
 		if err != nil {
 			if neterr, ok := err.(net.Error); ok && neterr.Temporary() {
 				log.Errf("Socket server: TCP Network: %s", err)
@@ -208,7 +207,6 @@ func (srv *Server) serveUDP(l *net.UDPConn) error {
 			return nil
 		}
 		srv.RUnlock()
-		log.Debugf("Socket server, incoming UDP connection from: %s", l.RemoteAddr())
 		if err != nil {
 			log.Errf("Socket server, read udp: %s", err)
 
@@ -216,7 +214,7 @@ func (srv *Server) serveUDP(l *net.UDPConn) error {
 		}
 
 		srv.inFlight.Add(1)
-		go srv.serve(s.RemoteAddr(), handler, m, l, nil, nil)
+		go srv.serve(s.RemoteAddr(), handler, m, l, s, nil)
 	}
 }
 
@@ -227,6 +225,7 @@ func (srv *Server) serve(a net.Addr, h Handler, m []byte, u *net.UDPConn, s *Ses
 	writer := &response{
 		udp:        u,
 		tcp:        t,
+		udpSession: s,
 		remoteAddr: a,
 	}
 
@@ -256,12 +255,14 @@ Exit:
 	// close socket after this many queries
 	if q > srv.tcpMaxQueries {
 		writer.Close()
+
 		return
 	}
 
 	// UDP, "close" and return
 	if u != nil {
 		writer.Close()
+
 		return
 	}
 
